@@ -1,14 +1,3 @@
-provider "google" {
-  credentials = file("terraform.json")
-  project     = var.project
-  region      = var.region
-  zone        = var.zone
-}
-
-# module "locust" {
-#   source = "./distributed_load_gen"
-# }
-
 variable "worker_no" {
   type    = number
   default = 2
@@ -20,7 +9,7 @@ resource "google_compute_firewall" "externalssh" {
 
   allow {
     protocol = "tcp"
-    ports    = ["22", "80"]
+    ports    = ["22"]
   }
 
   source_ranges = ["0.0.0.0/0"]
@@ -98,7 +87,7 @@ resource "google_compute_instance" "bastion" {
   }
 
   metadata = {
-    ssh-keys = "gcp:${file("./gcp.pub")}"
+    ssh-keys = "gcp:${file("~/.ssh/id_rsa.pub")}"
   }
 
   scheduling {
@@ -132,7 +121,7 @@ resource "google_compute_instance" "locust_master" {
   }
 
   metadata = {
-    ssh-keys = "gcp:${file("./gcp.pub")}"
+    ssh-keys = "gcp:${file("~/.ssh/id_rsa.pub")}"
   }
 
   scheduling {
@@ -167,7 +156,7 @@ resource "google_compute_instance" "locust_worker" {
   }
 
   metadata = {
-    ssh-keys = "gcp:${file("./gcp.pub")}"
+    ssh-keys = "gcp:${file("~/.ssh/id_rsa.pub")}"
   }
 
   scheduling {
@@ -178,6 +167,8 @@ resource "google_compute_instance" "locust_worker" {
 
   depends_on = ["google_compute_firewall.internal"]
 }
+
+// put these in the root module instead
 output "worker_no" {
   value = var.worker_no
 }
@@ -185,3 +176,4 @@ output "worker_no" {
 output "bastion_ip" {
   value = google_compute_instance.bastion.network_interface.0.access_config.0.nat_ip
 }
+

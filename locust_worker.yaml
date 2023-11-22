@@ -1,0 +1,15 @@
+---
+- name: Setup worker
+  hosts: workers
+  become: yes
+  remote_user: gcp
+
+  tasks:
+    - name: Start locust worker
+      docker_container:
+        name: locust_master
+        image: hamza13/loadgen2
+        state: started
+        pull: yes
+        command: ["locust", "--worker", "--master-host=10.0.0.10"]
+

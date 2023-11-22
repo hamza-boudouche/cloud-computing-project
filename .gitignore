@@ -1,3 +1,7 @@
 terraform.json
 .terraform/
 terraform.tfstate*
+*.tfvars
+inventory.ini
+gcp
+gcp.pub

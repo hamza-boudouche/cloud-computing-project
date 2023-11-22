@@ -1,0 +1,35 @@
+---
+- name: Setup master
+  hosts: master
+  become: yes
+  remote_user: gcp
+
+  tasks:
+    - name: Start locust master
+      docker_container:
+        name: locust_master
+        image: hamza13/loadgen2
+        state: started
+        pull: yes
+        expose:
+          - 8089
+        ports:
+          - "8089:8089"
+          - "5557:5557"
+        env:
+          FRONTEND_ADDR: "{{ lookup('env','FRONTEND_ADDR') }}"
+          USERS: "10"
+        command:
+          - "locust"
+          - "--master"
+          - "--headless"
+          - "--expect-workers={{ lookup('env', 'WORKER_NO') }}"
+          - "--host={{ lookup('env','FRONTEND_ADDR') }}"
+          - "-u {{ lookup('env','USER_NO') }}"
+          - "--csv=/tmp/locust"
+          - "--csv-full-history"
+        mounts:
+          - source: /home/gcp
+            target: /tmp
+            type: bind
+

@@ -9,3 +9,7 @@ keyed_groups:
     prefix: label
 filters:
   - labels.ansible != ""
+hostnames:
+  - name
+compose:
+  ansible_host: name
