@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+option go_package = "github.com/hamza-boudouche/orderlog";
+
+package orderlog;
+
+service Logger {
+    rpc Log (Entry) returns (Reply) {}
+}
+
+message Entry {
+    string content = 1;
+}
+
+message Reply {
+    bool ok = 1;
+}

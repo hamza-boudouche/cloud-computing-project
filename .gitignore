@@ -1,4 +1,4 @@
-terraform.json
+*.json
 .terraform/
 terraform.tfstate*
 *.tfvars
