@@ -1,19 +1,25 @@
+---
+apiVersion: v1
+data:
+  username: bG9nCg==
+  password: bG9nCg==
+kind: Secret
+metadata:
+  name: cluster-example-2-log
+  labels:
+    cnpg.io/reload: "true"
+type: kubernetes.io/basic-auth
+---
 # Example of PostgreSQL cluster
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
-  name: cluster-example
+  name: cluster-example-2
 spec:
   instances: 1
 
-  # Example of rolling update strategy:
-  # - unsupervised: automated update of the primary once all
-  #                 replicas have been upgraded (default)
-  # - supervised: requires manual supervision to perform
-  #               the switchover of the primary
   primaryUpdateStrategy: unsupervised
 
-  # Require 1Gi of space
   storage:
     size: 1Gi
 
@@ -24,3 +30,16 @@ spec:
         applicationCredentials:
           name: backup-creds
           key: gcsCredentials
+
+  managed:
+    roles:
+    - name: log
+      ensure: present
+      login: true
+      superuser: false
+      createdb: true
+      passwordSecret:
+        name: cluster-example-2-log
+      inRoles:
+        - pg_read_all_data
+        - pg_write_all_data
