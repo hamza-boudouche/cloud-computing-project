@@ -48,7 +48,7 @@ func init() {
     }
     fmt.Println("here")
     // creating logs table if it doesn't exist
-    _, err = db.Exec("create table if not exists logs ( id serial primary key, contents varchar (200) )");
+    _, err = db.Exec("create table if not exists logs ( id serial primary key, contents varchar (1000) )");
     if err != nil {
         log.Fatal(err)
     }

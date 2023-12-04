@@ -18,18 +18,33 @@
           - "5557:5557"
         env:
           FRONTEND_ADDR: "{{ lookup('env','FRONTEND_ADDR') }}"
-          USERS: "10"
+          USERS: "750"
         command:
           - "locust"
           - "--master"
           - "--headless"
           - "--expect-workers={{ lookup('env', 'WORKER_NO') }}"
           - "--host={{ lookup('env','FRONTEND_ADDR') }}"
-          - "-u {{ lookup('env','USER_NO') }}"
+          - "--users={{ lookup('env','USER_NO') }}"
+          - "--spawn-rate=5"
           - "--csv=/tmp/locust"
           - "--csv-full-history"
+          - "--html=/tmp/report.html"
         mounts:
           - source: /home/gcp
             target: /tmp
             type: bind
 
+    - name: Start stats handler
+      docker_container:
+        name: stats_handler
+        image: hamza13/statshandler:0.1.3
+        state: started
+        pull: yes
+        env:
+          BUCKET_NAME: perfstats-cloud
+          PROJECT_ID: cloudproject-404707
+        mounts:
+          - source: /home/gcp
+            target: /tmp
+            type: bind
