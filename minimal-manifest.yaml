@@ -309,6 +309,7 @@ metadata:
   labels:
     app: productcatalogservice
 spec:
+  replicas: 3
   selector:
     matchLabels:
       app: productcatalogservice

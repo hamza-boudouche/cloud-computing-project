@@ -432,3 +432,155 @@ canary releases. We will briefly discuss these situations at the end of this sec
 
 #### Creating a new version of a microservice
 
+The microservice we chose to work with is the `productcatalogservice` where we
+made a simple change to the `products.json` file (TODO: insert link to old file).
+We simply changed the name of the product with ID `OLJCESPC7Z` from `Sunglasses`
+to `SunglassesV2`.
+
+This new version was built and pushed to [DockerHub](https://hub.docker.com/repository/docker/hamza13/productcatalogservice/general)
+with image name `hamza13/productcatalogservice:v2.1`.
+
+We then changed the Kubernetes manifest to include the following:
+
+```yaml
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: productcatalogservice-v2
+  labels:
+    app: productcatalogservice
+spec:
+  selector:
+    matchLabels:
+      app: productcatalogservice
+  template:
+    metadata:
+      labels:
+        app: productcatalogservice
+    spec:
+      serviceAccountName: default
+      terminationGracePeriodSeconds: 5
+      securityContext:
+        fsGroup: 1000
+        runAsGroup: 1000
+        runAsNonRoot: true
+        runAsUser: 1000
+      containers:
+      - name: server
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+              - ALL
+          privileged: false
+          readOnlyRootFilesystem: true
+        image: hamza13/productcatalogservice:v2.1
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3550
+        env:
+        - name: PORT
+          value: "3550"
+        - name: DISABLE_PROFILER
+          value: "1"
+        readinessProbe:
+          grpc:
+            port: 3550
+        livenessProbe:
+          grpc:
+            port: 3550
+        resources:
+          requests:
+            cpu: 100m
+            memory: 64Mi
+          limits:
+            cpu: 200m
+            memory: 128Mi
+```
+
+This represents a new deployment that uses the new version of `productcatalogservice`.
+The most important point here is that this deployment should have the same label
+that is used as a selector by the kubernetes service `productcatalogservice` which is `app: productcatalogservice`.
+This will ensure that pods of both the old and new deployment of this microservice
+will be registered as endpoints of the kubernetes service, making it possible to
+distribute the traffic between the 2 versions.
+
+As for the requirement concerning the percentage of the traffic hitting each version,
+we decided to control by changing the numbers of replicas that each version has.
+So to route 25% of the traffic to v2, we had to create 3 replicas of version 1,
+and 1 replica of version 2.
+
+In order to check if we're accessing the first or the second version throught the
+frontend we need to fetch the HTML of the page `/product/OLJCESPC7Z` and check if the
+product's name is `Sunglasses` or `SunglassesV2`.
+
+We wrote the bash script `./canary/canary_test.sh` that does this automatically
+and counts the number as well as the percentage of responses it gets from each version.
+
+You can test the script by executing the following command:
+
+```bash
+bash ./canary/canary_test.sh http://$FRONTEND_ADDR/product/OLJCESPC7Z 2000
+```
+
+This script accepts 2 arguments, the URL it will send requests to, and the number
+of requests to send. As expected, when executing this script we got results that were very close to the
+25/75 distribution we were aiming for.
+
+In order to fully switch to the new version after validating that it works, we
+can use the following command to execute a script that sets the replicas of the
+first version to 0, effectively redirecting all the traffic to the new version.
+This does not seem to distrupt in-flight requests as we didn't notice any failed
+requests when executing the script `./canary/canary_test.sh` and switching in the
+same time. This is due to [the fact that](https://kubernetes.io/docs/concepts/workloads/pods/pod-lifecycle/#pod-termination)
+before pod deletion, a `SIGTERM` signal is sent to the container and a grace
+period is allowed for that container to respond to that signal and terminate gracefully.
+
+```bash
+bash ./canary/canary_switch.sh
+```
+
+##### NB
+
+The results obtained in this part are not reproducible on a GKE created without
+the `NetworkPolicy` addon, this is why the command we gave in the [first section](###Deploying-the-original-application-in-GKE)
+to create the cluster has the flag `--enable-network-policy`.
+
+When the cluster is created without that flag, the kubernetes service `productcatalogservice`
+does not seem to be able to load balance traffic between pods from different
+deployments, but only to one deplyment at a time (if you create deployment for
+v1 and then for v2, the service will only forward traffic to v1, and only when deployment v1
+is deleted does the service start forwarding traffic to deployment v2).
+
+##### When to use a service mesh
+
+As we just described, it is possible to implement canary releases using only
+core Kubernetes resources, but this can be limiting because it doesn't permit a
+great degree of customization when it comes to the percentage split we want to
+achieve. Take for example the case where we want to route only 1% of the traffic
+to the new version, then we would have to create 99 pods of version 1, and one
+pod of version 2, which can potantially lead to a high resource usage and a relatively
+expensive cloud bill. This can be solved efficiently by using a service mesh
+like Istio where traffic is controlled by envoy proxies that forward the traffic
+according the the rules defined by the user.
+
+Another situation where it can be useful to use a service mesh is if we wanted
+to enable autoscaling for the `productcatalogservice` deployments. In this case
+it wouldn't be possible to control the traffic percentage split because the
+number of pods of each deployment will be constantly changing according to the
+metric we use for autoscaling. Istio avoids this problem as it doesn't rely on
+the number of pods to enforce its traffic rules.
+
+## Bonus steps
+
+### Performance evaluation
+
+
+
+### Managing a storage backend for logging orders
+
+
+
+### Deploying your own Kubernetes infrastructure
+
+
