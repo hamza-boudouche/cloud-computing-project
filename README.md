@@ -573,12 +573,223 @@ the number of pods to enforce its traffic rules.
 
 ## Bonus steps
 
-### Performance evaluation
+### Performance evaluation bonus
 
+TODO: rerun tests and verify results
 
+We ran the same performance evaluation procedure that we described in the section
+[Performance evaluation](###Performance-evaluation) on the same load generation
+infrastructure we were working with before, a master and 2 workers of size `f1-micro`
+using the following configuration:
+- 500 users
+- spawn rate of 5 users/second
+This produced the following graph where we focus on the average response time of
+the application for requests sent to the endpoint `/` with respect to the number of
+users:
+
+TODO: add graph here
+
+TODO: add explanation here
+
+We reran the load generation with a bigger number of users:
+- 750 users
+- spawn rate of 5
+
+This produced the following graph that focuses on the same parameters as the previous
+one.
+
+(TODO: add graph here)
+
+This graph shows that the application struggles to keep up with the growing
+number of users since the average response time getting slower. This shows us
+that the and/or the infrastructure are saturated and may have a bottlneck.
+
+In order to identify this bottlneck we decided to take a look at the dashboard
+(TODO: add name of the dashboard) that shows the percentages of utilisation of
+the CPU requests and limits of each one of the pods we deployed on GKE. We noticed
+that the `currencyservice` uses 95% of its CPU limits, meaning that it consumed
+all of its CPU requests and it's bottlnecked by the hard limit of CPU, and that
+the `frontend` pod usesaround 98% of its CPU requests, so it can also present an
+important bottlneck.
+
+We also noticed, during the execution of the load generation, that the RAM usage
+of the pod `currencyservice` gets exceptionally high over time to the point where
+it fails with the error `OOMKILLED` which stands for Out Of Memory, suggesting that
+it was killed due to the high memory usage we noticed.
 
 ### Managing a storage backend for logging orders
 
+In this part, we created a new microservice called `Orderlog`. The code of this
+microservice is located at `./orderlog/`. It is implemented using the Go programming
+language and grpc with protocol buffers. Its goal is to save received order log messages
+into a persistant database.
+
+The database we chose for this is Postgresql deployed on the same GKE cluster as
+the rest of the Online Boutique application, using the [Cloudnative-pg operator](https://cloudnative-pg.io/).
+This operator greatly simplifies and streamlines the process of deployment of
+Postgres while taking into account performance, resiliancy and disaster recovery.
+
+We will begin by deploying Postgresql on GKE as it is the foundation of the `Orderlog`
+microservice, and to do that we apply the following steps:
+1. Start by creating a new storage class on GKE using the following manifest:
+```yaml
+allowVolumeExpansion: true
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  annotations:
+    components.gke.io/component-name: pdcsi
+    components.gke.io/component-version: 0.16.14
+    components.gke.io/layer: addon
+    storageclass.kubernetes.io/is-default-class: "true"
+  labels:
+    addonmanager.kubernetes.io/mode: EnsureExists
+    k8s-app: gcp-compute-persistent-disk-csi-driver
+  name: retain-storage-class
+  resourceVersion: "757"
+parameters:
+  type: pd-balanced
+provisioner: pd.csi.storage.gke.io
+reclaimPolicy: Retain
+volumeBindingMode: WaitForFirstConsumer
+```
+This manifest is exactly similar to the one used to create the default storage
+class in GKE, with the exception of the `reclaimPolicy` which we changed from `Delete`
+(which deletes the persistant volume when the corresponding persistant volume claim
+is deleted), to `Retain` (which retains the persistant volume unless manually deleted).
+This storage class is set as the default in the cluster we are using.
+
+This will help prevent any loss of data by accidentally deleting a persistant
+volume claim, and will also make it possible to recover the latest data that was
+written into Postgres in case of a major disaster, although than can be more challenging
+compared to the strategies of data snapshotting and recovery that we discuss later.
+
+2. We create the Google storage bucket where we will store snapshots of the database.
+```bash
+export BUCKET_NAME=persistancy
+gcloud storage buckets create gs://$BUCKET_NAME
+```
+
+3. And we create a service account that has suffisant rights to list, create, modify
+and delete objects from that GCS bucket:
+```bash
+export SERVICE_ACCOUNT=persistancy
+export PROJECT_ID=xxxxxxxxxxxxx
+gcloud iam service-accounts create $SERVICE_ACCOUNT
+gcloud projects add-iam-policy-binding $PROJECT_ID \
+    --member serviceAccount:$SERVICE_ACCOUNT@$PROJECT_ID.iam.gserviceaccount.com \
+    --role roles/storage.admin
+gcloud iam service-accounts keys create ./$SERVICE_ACCOUNT.json \
+    --iam-account $SERVICE_ACCOUNT@$PROJECT_ID.iam.gserviceaccount.com
+```
+This will save the service accounts key in a JSON file that should **not** be
+committed into source control. We will use it to create a Kubernetes secret that
+will be used by Cloudnative-pg to store spanshots in GCS:
+```bash
+kubectl create secret generic backup-creds --from-file=gcsCredentials=./$SERVICE_ACCOUNT.json
+```
+
+4. We then deploy `Cloudnative-pg` on the cluster using the `kubectl`:
+```bash
+kubectl apply -f \
+  https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.21/releases/cnpg-1.21.1.yaml
+```
+
+5. We are now ready to create the Postgresql cluster, by applying the
+manifest `./pgcluster.yaml`. It describes the secret used to store the username
+and password we use to connect to Postgresql (we are aware that this secret is
+not encrypted and should not be committed into source control, but we chose to
+do it this way for the sake of simplicity) and the Postgresql cluster itself in which
+we defined the number of instances of the Postgresql cluster and the backup
+strategy we're using (GCE bucket).
+
+6. Finally, we need to configure scheduled automatic backups for this cluster by
+applying the manifest `./backup_auto.yaml` that will backup the Postgres data to
+the Google storage bucket every day at midnight.
+
+Now that the postgresql cluster is ready to be used, we will implement the Orderlog
+microservice.
+
+1. We start by defining the protocol buffers contract in the `./orderlog/log/log.proto` file.
+The main element it contains is the declaration of the remote procedure `Log` we are implementing:
+```proto
+service Logger {
+    rpc Log (Entry) returns (Reply) {}
+}
+```
+2. Then, we need to generate the corresponding Go code that defines the structs
+we will be using to implement the Orderlog server. This can be done using the `protoc`
+CLI tool:
+```bash
+protoc --go_out=. \
+    --go_opt=paths=source_relative  \
+    --go-grpc_out=. \
+    --go-grpc_opt=paths=source_relative \
+    ./log/log.proto
+```
+This command needs to be executed from the root of the Orderlog microservice code,
+`./orderlog/`.
+
+3. The server implementation, written in the file `./orderlog/log_server/main.go`, uses the `database/sql` module to communicate with
+the Postgres database we deployed previously. It contains 3 main functions:
+    - `func init()` is the first function that is called and its role is to initialize the connection
+    and check if the `log` database and the `logs` table exist (and create them if not).
+    - `func (s *server) Log(ctx context.Context, in *pb.Entry) (*pb.Reply, error)` represents
+    the implementation of the `Log` remote procedure we declared in `./orderlog/log/log.proto`.
+    It writes the entry that was passed to it as a parameter in the `logs` table.
+    - `func main()` is the main function of this microservice. It initializes the grpc
+    server and binds it to the port 50051.
+
+4. A Dockerfile inspired by the Dockerfiles of the Go microservices of the Online Boutique
+repository is also used to create a container image that's [pushed to Dockerhub](https://hub.docker.com/repository/docker/hamza13/orderlog/general)
+under the name `hamza13/orderlog`
+
+5. The Kubernetes manifest used to deploy this microservice is added to the file
+`./minimal-manifest.yaml`. We used a Kubernetes deployment and a service to expose
+it to the rest of the microservices.
+
+6. The code of the `checkoutservice` was adapted to call the `Log` procedure of
+the `Orderlog` microservice over grpc and its docker image was rebuilt and [pushed
+to Dockerhub](https://hub.docker.com/repository/docker/hamza13/checkoutservice/general)
+under the name `hamza13/checkoutservice`. This new implementation is included in this
+repository under the folder `./checkoutservice/`. The main changes we made were:
+    - Adding the `log.proto` file and generating corresponding Go code using it (just like
+    we did for the `Orderlog` implementation in step 2)
+    - Calling the `Log` procedure in the end of the `PlaceOrder` function.
+
+TODO: copy checkoutservice folder to this repo
+
+After deploying the new `Orderlog` and `Checkoutservice` implementation and passing
+some orders on the frontend, we can log into the database and look at the records by
+following these steps:
+1. Start a terminal session inside one of the pods of the Postgresql cluster:
+```bash
+kubectl exec -it cluster-example-2-1 -- /bin/sh
+```
+
+2. Connect to the Potgres database
+```bash
+psql
+```
+
+3. Use the `Log` database
+```bash
+\c log
+```
+
+4. Select all entries from the `logs` table
+```sql
+SELECT * FROM logs;
+```
+
+In case of a major disaster impacting the GKE cluster we deployed the Postgresql
+database on, we can recreate a new GKE cluster and a new Postgresql cluster on it
+by using the manifest `./pgclusterrestored.yaml` which uses the backups we configured
+to run periodically on Google Cloud Storage buckets. However, we will not be able
+to recover data that was written into the old database after the last backup was made.
+This problem can be remediated by scheduling backups on a more frequent schedule
+(twice a day, or every hour) according to our use case and the tolerations we have
+regarding performance and data integrity.
 
 
 ### Deploying your own Kubernetes infrastructure
