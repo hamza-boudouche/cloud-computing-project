@@ -25,7 +25,7 @@ scp -i ./gcp ./loadbalancer.yaml $user@$bastion_ip:/tmp/loadbalancer.yaml
 
 scp -i ./gcp ./persistancy.json $user@$bastion_ip:/tmp/persistancy.json
 
-ssh -i ./gcp $user@$bastion_ip "scp -i /tmp/gcp /tmp/persistancy.json $user@10.0.0.10:/home/gcp/persistancy.json"
+ssh -i ./gcp $user@$bastion_ip "sudo scp -i /tmp/gcp -o StrictHostKeyChecking=no /tmp/persistancy.json gcp@10.0.0.10:/home/gcp/persistancy.json"
 
 cat > inventory.ini <<EOF
 [all:vars]

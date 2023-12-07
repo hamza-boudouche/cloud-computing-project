@@ -223,7 +223,7 @@ using ansible playbooks.
 
 NB: There were many changes to the code that was written at this step of the project
 because of the requirements of the next steps. In order to view the state of the code
-at this particular step, switch to the branch BRANCH_NAME. TODO: add branch from old commit.
+at this particular step, switch to the branch [loadgen](https://github.com/hamza-boudouche/cloud-computing-project/tree/loadgen).
 
 The setup we made functions as follows:
 - We start by creating a service account using the following commands:
@@ -254,14 +254,14 @@ how this can be done:
 bash ./main.sh
 ```
 
-The `main.sh` file (TODO: add link to the file) does the following (in this order):
+The [`main.sh`](https://github.com/hamza-boudouche/cloud-computing-project/blob/loadgen/main.sh) file does the following (in this order):
 1. Initializes Terraform, by fetching all the necessary providers.
 2. Generates an ssh key-pair that will be used to access the GCE virtual machine
 that we will be creating.
 3. Applies the terraform resources that are described in the terraform files that
 exist in the current working directory of the shell, which should be the root of
 the project. These files are:
-    - simple_deployment.tf (TODO: add link to this file): which declares the
+    - [simple_deployment.tf](https://github.com/hamza-boudouche/cloud-computing-project/blob/loadgen/simple_deployment.tf): which declares the
     following cloud resources:
         - A firewall: to restrict the access to the machine to the port 22 (for ssh),
         with the TCP protocol.
@@ -270,7 +270,7 @@ the project. These files are:
         instance since this will help us reduce the costs of our tests whithout
         having any effect on the Online boutique application that runs independently
         from the load generation infrastructure.
-    - variables.tf (TODO: add link to this file): which contains declarations of
+    - [variables.tf](https://github.com/hamza-boudouche/cloud-computing-project/blob/loadgen/variables.tf): which contains declarations of
     some the variables used by terraform, such as the GCP project ID and the
     region in which the resources will be deployed.
 4. Executes a `setup.sh` bash file that is responsible for configuring the newly
@@ -326,8 +326,7 @@ using bash scripts.
 A cluster of Locust nodes is formed by creating a Locust master node (the master
 is created by launching the `locust` CLI with the `--master` flag) and, in our
 case, 2 Locust workers (created with the `--worker` flag). The number of workers
-can be changed easily by adjusting the value of the terraform variable `worker_no`
-(TODO: insert link to the variable).
+can be changed easily by adjusting the value of the terraform variable [`worker_no`](https://github.com/hamza-boudouche/cloud-computing-project/blob/b26e82098f92f4074f35e01d02dd6f69cfbb2c50/simple_deployment.tf#L12)
 - Separate playbooks are created for the Locust master node and for the workers,
 since they require different configurations that go beyond the flags passed to
 the `locust` CLI throught the docker container.
@@ -363,11 +362,11 @@ terraform destroy -auto-approve
 
 #### Infrastructure as Code
 
-TODO: make a diagram to simplify this
+![load generator architecture](./png/loadgen.png)
 
 The infrastructure needed to run the performance evaluation
 is provisionned using Terraform. The cloud resources we created are described in
-the file `simple_deployment.tf` (TODO: insert link to this file). The main ones are:
+the file [`simple_deployment.tf`](./simple_deployment.tf). The main ones are:
 - A google compute instance representing the Locust master.
 - 2 google compute instances representing each one of the workers. This number can
 be customized simply by changing the value of the terraform variable `worker_no`.
@@ -415,9 +414,12 @@ appears to be closed but that's only because it was marked as stale automaticall
 
 As a workaround, we used a separately maintained Github projet called [Locust reporter](https://github.com/benc-uk/locust-reporter)
 that generates graphs and aggregates Locust data using only the csv file generated
-by Locust (we had no problem in generating and recovering them).
+by Locust (we had no problem in generating and recovering them). Here are some of
+these graphs:
 
-TODO: insert graphs here
+![stats](./png/stats.png)
+![stats](./png/getproduct.png)
+![stats](./png/postcurrency.png)
 
 ### Canary releases
 
@@ -431,7 +433,7 @@ canary releases. We will briefly discuss these situations at the end of this sec
 #### Creating a new version of a microservice
 
 The microservice we chose to work with is the `productcatalogservice` where we
-made a simple change to the `products.json` file (TODO: insert link to old file).
+made a simple change to the [`products.json`](https://github.com/GoogleCloudPlatform/microservices-demo/blob/1046ac9c08dd1f40effa9bed588f0f532f38dc81/src/productcatalogservice/products.json#L5) file.
 We simply changed the name of the product with ID `OLJCESPC7Z` from `Sunglasses`
 to `SunglassesV2`.
 
@@ -573,46 +575,37 @@ the number of pods to enforce its traffic rules.
 
 ### Performance evaluation bonus
 
-TODO: rerun tests and verify results
-
 We ran the same performance evaluation procedure that we described in the section
 [Performance evaluation](###Performance-evaluation) on the same load generation
 infrastructure we were working with before, a master and 2 workers of size `f1-micro`
 using the following configuration:
-- 500 users
+- 750 users
 - spawn rate of 5 users/second
-This produced the following graph where we focus on the average response time of
-the application for requests sent to the endpoint `/` with respect to the number of
+This produced the following graph where we focus on the request rate of
+the application for requests sent to the endpoint `GET /` with respect to the number of
 users:
 
-TODO: add graph here
-
-TODO: add explanation here
-
-We reran the load generation with a bigger number of users:
-- 750 users
-- spawn rate of 5
-
-This produced the following graph that focuses on the same parameters as the previous
-one.
-
-(TODO: add graph here)
+![stats](./png/stats.png)
 
 This graph shows that the application struggles to keep up with the growing
-number of users since the average response time getting slower. This shows us
+number of users since the request rate stays constant. This shows us
 that the and/or the infrastructure are saturated and may have a bottlneck.
 
 In order to identify this bottlneck we decided to take a look at the dashboard
-(TODO: add name of the dashboard) that shows the percentages of utilisation of
+`Kubernetes / Compute Resources / Namespace (Pods)` that shows the percentages of utilisation of
 the CPU requests and limits of each one of the pods we deployed on GKE. We noticed
 that the `currencyservice` uses 95% of its CPU limits, meaning that it consumed
 all of its CPU requests and it's bottlnecked by the hard limit of CPU, and that
 the `frontend` pod usesaround 98% of its CPU requests, so it can also present an
 important bottlneck.
 
+![currencyservice](./png/currencyservice.png)
+
+![frontend](./png/frontendservice.png)
+
 We also noticed, during the execution of the load generation, that the RAM usage
 of the pod `currencyservice` gets exceptionally high over time to the point where
-it fails with the error `OOMKILLED` which stands for Out Of Memory, suggesting that
+it fails with the error `OOMKILLED` suggesting that
 it was killed due to the high memory usage we noticed.
 
 ### Managing a storage backend for logging orders
@@ -687,7 +680,7 @@ will be used by Cloudnative-pg to store spanshots in GCS:
 kubectl create secret generic backup-creds --from-file=gcsCredentials=./$SERVICE_ACCOUNT.json
 ```
 
-4. We then deploy `Cloudnative-pg` on the cluster using the `kubectl`:
+4. We then deploy `Cloudnative-pg` on the cluster using `kubectl`:
 ```bash
 kubectl apply -f \
   https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.21/releases/cnpg-1.21.1.yaml
@@ -755,8 +748,6 @@ repository under the folder `./checkoutservice/`. The main changes we made were:
     we did for the `Orderlog` implementation in step 2)
     - Calling the `Log` procedure in the end of the `PlaceOrder` function.
 
-TODO: copy checkoutservice folder to this repo
-
 After deploying the new `Orderlog` and `Checkoutservice` implementation and passing
 some orders on the frontend, we can log into the database and look at the records by
 following these steps:
@@ -779,6 +770,8 @@ psql
 ```sql
 SELECT * FROM logs;
 ```
+
+![logs from db](./png/logs.png)
 
 In case of a major disaster impacting the GKE cluster we deployed the Postgresql
 database on, we can recreate a new GKE cluster and a new Postgresql cluster on it

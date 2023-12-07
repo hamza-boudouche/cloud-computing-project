@@ -1,4 +1,5 @@
-*.json
+persistancy.json
+terraform.json
 .terraform/
 terraform.tfstate*
 *.tfvars
