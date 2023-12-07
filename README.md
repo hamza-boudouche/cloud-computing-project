@@ -784,5 +784,83 @@ regarding performance and data integrity.
 
 
 ### Deploying your own Kubernetes infrastructure
+In the previous sections of this project, we worked with the Kubernetes cluster provided by Google by using the GKE (Google Kubernetes Engine) service. In this section, we will create our own Kubernetes cluster with a tool called k3s,it allows us to provision a lightweight Kubernetes cluster on our machines that can be used for various domains such us IoT and Edge computing.
+https://docs.k3s.io/
 
+To provision our cluster, we followed the following steps:
+#### 1. Provisioning the virtual machines to run our servers
+In order for our infrastructure to be automated, we need tools that allows us to automatically create and destroy our resources in a declarative way. To do so, we used terraform.
+https://developer.hashicorp.com/terraform?product_intent=terraform
+
+To set up terraform, we first created `k3s/terraform/variables.tf` a terraform file written in HashiCorp Markup Language to declare all the variables that will be needed in our main file, this allows us to have a flexible configuration. After that we created the main terraform file found in `k3s/terraform/terraform.tf` this is where we declare all of our resources.
+Inside the `k3s/terraform/terraform.tf` file we :
+ 1. Specified the cloud provider, the service account credentials, the project, the region and the zone.
+ 2. Created a VPC (Virtual Private network) for our machines with a router and a NAT.
+ 3. A firewall rule to allow ssh connection.
+ 4. A master compute instance, which will be the control plane for our Kubernetes cluster, in our case we set up the number of replicas in our variable files to three for high availability and the instance type to **e2-standard-2** to support our application load. We also specified the ssh keys so we can connect to these machines later on.
+ 5. A worker computer instance which will be used to host our pods, we created four replicas with a similar configuration to the masters.
+ 6. At last, we export the IP addresses of our machines.
+ 
+To run this configuration, we can execute
+```bash
+terraform init //to initalize the backend
+terraform plan // to checkout the changes to commit 
+terraform apply //to apply the configuration
+```
+And to destroy our resources we use ```terraform destrory``` however we won't be using these commands directly since we will use other tools to install k3s on our machines.  
+
+  #### 2. Configuring the master and worker nodes.
+After provisioning  our machines using terraform, we need to install k3s on the master nodes and connect the worker to the control plane. To do so, we used a tool called Ansible, which is an infrastructure as a code tool that allows us to execute tasks in an automated way.
+https://docs.ansible.com/
+
+In the first step, we created a `k3s/main.sh` file which will contain all the bash commands needed to manage terraform and Ansible, in that scrip we created the **ssh_keys** that will be used by Ansible to connect to our machines, we ran the **terraform init and apply** commands to provision our resources, after that we got the outputs from terraform containing the IP addresses of the master/workers nodes. We used these IPs to dynamically create an inventory `k3s/ansible/inventory.ini`, a file used by Ansible to determine the hosts that we will target for our configuration. We also created `k3s/ansible/ansible.cfg` which contains environmental variables such as the location of the private ssh keys. 
+
+To apply  its configuration, Ansible uses a file called **playbook** which as a YAML file containing multiple plays for each host, each play contains multiple tasks to be executed. Our `k3s/ansible/playbook.yaml` contains the following plays:
+1. **k3s master play** : this play is executed on the first master of our inventory, it's responsible for initializing the k3s cluster and saving the cluster token.
+
+```yaml
+- name: k3s master
+  hosts: first_master
+  become: true
+    tasks:
+  - name: install k3s on first master
+    shell: curl -sfL https://get.k3s.io | sh -s - server --cluster-init
+    become: true
+
+  - name: Get the k3s cluster token
+    shell: cat /var/lib/rancher/k3s/server/node-token
+    register: k3s_token
+    become: true
+
+- name: Save token
+    set_fact:
+      token: "{{k3s_token.stdout}}"
+```
+2. **Join masters to cluster** : this play allows us to join the rest of the masters to the control plane cluster using the token that we saved in the last play.
+```yaml
+- name: Join masters to cluster
+  hosts: joined_masters
+  become: true
+
+  tasks:
+  - name: Join masters to cluster
+    shell: curl -sfL https://get.k3s.io | K3S_TOKEN="{{ hostvars[groups['first_master'][0]].token }}" sh -s - server --server https://{{ hostvars[groups['first_master'][0]].ansible_default_ipv4.address }}:6443
+    become: true
+```
+3. **Join nodes to the cluster** : This play executes the last task that will link our nodes to the control plane.
+
+```yaml
+- name: Join nodes to the cluster
+  hosts: nodes
+  become: true
+
+  tasks:
+- name: Join nodes to the k3s cluster
+  shell: curl -sfL https://get.k3s.io | K3S_TOKEN="{{ hostvars[groups['first_master'][0]].token }}" sh -s - agent --server https://{{ hostvars[groups['first_master'][0]].ansible_default_ipv4.address }}:6443
+  become: true
+```
+After writing our playbook, we add the command to the `k3s/main.sh` file execute our playbook.
+```bash 
+ansible-playbook  -i  inventory.ini  playbook.yaml 
+```
 
