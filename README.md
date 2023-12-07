@@ -5,11 +5,11 @@
 ### Deploying the original application in GKE
 
 We started by creating a GKE cluster in order to deploy the application in it.
-As explained in the lab assignment, there are 2 types of Kubernetes clusters we
-can use in this case when working with the GKE service: standard GKE clusters,
+As explained in the lab assignment, there are two types of Kubernetes clusters we
+can use when working with the GKE service: standard GKE clusters,
 and Autopilot GKE clusters.
 
-The difference between these 2 types of clusters is that in the former, workers
+The difference between these two types of clusters is that in the former, workers
 are managed by the user, while in the latter, they are managed by GCP in a
 transparent way with respect to the cluster users. The main advantages of
 autopilot clusters compared to standard ones are:
@@ -78,7 +78,7 @@ kubectl get deploy -w
 
 Now that all the microservices of the application are deployed and ready, we can
 fetch the IP address that was assigned to the LoadBalancer service (named `frontend-external`) that exposes
-the application's frontend on the internet:
+the application's frontend to the internet:
 
 ```bash
 kubectl get svc frontend-external | awk '{print $4}' | tail -1
@@ -88,7 +88,7 @@ If the result is `<pending>`, this means that the load balancer is still getting
 and that the public IP adresse wasn't assigned to the service yet. This process can take
 some time.
 
-We can then check if the application is working by visiting the IP adresse we just
+We can then check if the application is working by visiting the IP adresse that we just
 got in a web browser. We can also verify the logs of the load generation microservice
 by executing the following command:
 
@@ -186,7 +186,7 @@ The main change we made was removing the `ENTRYPOINT` of the docker image,
 because we wanted to customize the command that will be passed to the container
 upon its creation.
 
-This new Dockerfile should be put instead of the old Dockerfile (in the same location),
+This new Dockerfile should be used instead of the old Dockerfile (in the same location),
 and built using the following command:
 
 ```bash
@@ -206,14 +206,16 @@ docker run -d hamza13/loadgen2 locust --headless --host=http://$FRONTEND_IP
 ```
 
 The first command fetches the public IP address of the application's frontend
-and stores it in the variable `FRONTEND_IP` which will then be used by the second
-command, in which we start a docker container using the docker image we built before
-and we pass to it the Locust CLI command to run it in headless mode and to specify the host.
+and stores it in the variable `FRONTEND_IP`.This variable be used by the second
+command , in which we start a docker container using the docker image we built before.
+To run our container, we pass the following arguments : the docker image, the Locust CLI 
+command, the headless mode argument and the host using the `FRONTEND_IP` variable.
+
 
 ### Deploying automatically the load generator in Google cloud
 
 As explained by the lab, it will be better to deploy the load generator on the cloud
-since that will provide more consistant and replicable results, but outside of the
+since it will provide more consistant and replicable results, however it must be outside of the
 GKE cluster in which we deployed the application so that it doesn't consume
 compute resources that are destined for the application itself.
 
@@ -267,11 +269,11 @@ the project. These files are:
         with the TCP protocol.
         - A Google compute instance which is the VM we're creating, to which we
         give the ssh public key we created before. We chose to make this VM a spot
-        instance since this will help us reduce the costs of our tests whithout
+        instance since this will help us reduce the costs of our tests without
         having any effect on the Online boutique application that runs independently
         from the load generation infrastructure.
     - [variables.tf](https://github.com/hamza-boudouche/cloud-computing-project/blob/loadgen/variables.tf): which contains declarations of
-    some the variables used by terraform, such as the GCP project ID and the
+    some of the variables used by terraform, such as the GCP project ID and the
     region in which the resources will be deployed.
 4. Executes a `setup.sh` bash file that is responsible for configuring the newly
 created VM. This script does the following:
@@ -310,13 +312,13 @@ Infrastructure monitoring is crucial in any system, it allows us to take a look 
 To monitor our infrastructure, we decided to use Prometheus and Grafana.
 
 Prometheus is an open-source monitoring tools that allows us to scrap various metrics from our infrastructure.
-In Prometheus, data scraping  can be customized to the application needs by specifying the scrapping rules in the Prometheus config file. It also allows us to create alert based on these metrics.
+In Prometheus, data scraping  can be customized to the application needs by specifying the scrapping rules in the Prometheus config file. It also allows us to create alerts based on these metrics.
 https://prometheus.io/docs/introduction/overview/
 
 The metrics collected by Prometheus are hard to read and interpret, that's why we need another tool that can visualize our data. To do so, we used Grafana, an open source analytics and visualization web application.
 https://grafana.com/docs/grafana/latest/
 
-To properly install Prometheus and Grafana in Kubernetes, we need to create multiple deployment files and services responsible for deploying the applications containers, the metrics collectors, the alert managers the config maps to store the Prometheus configuration and custom controllers to manage theirs state. Doing manually this task is error-prone, that's why we decided to use a helm chart.
+To properly install Prometheus and Grafana in Kubernetes, we need to create multiple deployment files and services which are responsible for deploying : the applications containers, the metrics collectors, the alert managers,the config maps to store the Prometheus configuration and custom controllers to manage theirs state. Doing these tasks manually is error-prone, that's why we decided to use a helm chart.
 
 Helm is a packaging tool that groups Kubernetes resources into what we call a chart. A chart can range from a simple deployment file for a simple service to a full scale application.
 https://helm.sh/docs/topics/charts/
@@ -349,7 +351,7 @@ As we can see in the following image, we have all the dashboard for our Kubernet
 ### Performance evaluation
 
 This part is an extension of the part [Deploying automatically the load generator in Google cloud](###Deploying-automatically-the-load-generator-in-Google-cloud).
-That's why we will be keeping the same provisionning and configuration strategy,
+That's why we will be using the same provisionning and configuration strategy,
 with some added improvements.
 
 The strategy we followed in order to evaluate the performances of the Online boutique
@@ -359,7 +361,7 @@ runs, but in the same GCP zone, meaning in the same datacenter. This allows us
 to decouple the load generator's metrics of the varying state of the network as
 much as possible.
 - Similarly to what we did in the section [Deploying automatically the load generator in Google cloud](###Deploying-automatically-the-load-generator-in-Google-cloud),
-we automated the whole process (with some minor details that should still be done manually and that we will discuss later)
+we automated the whole process (with some minor details that should still be done manually that we will discuss later)
 using bash scripts.
 - The load generator is deployed in a distributed manner, as described in the
 [Locust documentation](https://docs.locust.io/en/stable/running-distributed.html).
@@ -446,7 +448,7 @@ According to the [Locust documentation](https://docs.locust.io/en/stable/configu
 we can pass the flag `--html` to instruct it to generate an HTML report containing
 aggregated statistics about the host we are benchmarking  in the form of graphs.
 
-Working with this functionalityproved to be difficult since it wasn't reliable
+Working with this functionality proved to be difficult since it wasn't reliable
 at all (restarting the containers, for example, causes the report to not be updated
 anymore). We suspect that this is due to [some bugs](https://github.com/locustio/locust/issues/1693) that were reported as issues
 on the Locust Github repository and that are still not solved (the linked issue
