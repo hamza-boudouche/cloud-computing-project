@@ -827,45 +827,44 @@ To apply  its configuration, Ansible uses a file called **playbook** which as a 
 
 ```yaml
 - name: k3s master
-	hosts: first_master
-	become: true
-	
-	tasks:
-		- name: install k3s on first master
-		shell: curl -sfL https://get.k3s.io | sh -s - server --cluster-init
-		become: true
-		
-		- name: Get the k3s cluster token
-		shell: cat /var/lib/rancher/k3s/server/node-token
-		register: k3s_token
-		become: true
-		
+  hosts: first_master
+  become: true
+    tasks:
+    - name: install k3s on first master
+    shell: curl -sfL https://get.k3s.io | sh -s - server --cluster-init
+    become: true
+
+    - name: Get the k3s cluster token
+    shell: cat /var/lib/rancher/k3s/server/node-token
+    register: k3s_token
+    become: true
+
 - name: Save token
-	set_fact:
-		token: "{{k3s_token.stdout}}"
+    set_fact:
+      token: "{{k3s_token.stdout}}"
 ```
 2. **Join masters to cluster** : this play allows us to join the rest of the masters to the control plane cluster using the token that we saved in the last play.
 ```yaml
 - name: Join masters to cluster
-	hosts: joined_masters
-	become: true
+  hosts: joined_masters
+  become: true
 
-	tasks:
-	- name: Join masters to cluster
-	shell: curl -sfL https://get.k3s.io | K3S_TOKEN="{{ hostvars[groups['first_master'][0]].token }}" sh -s - server --server https://{{ hostvars[groups['first_master'][0]].ansible_default_ipv4.address }}:6443
-	become: true
+  tasks:
+    - name: Join masters to cluster
+    shell: curl -sfL https://get.k3s.io | K3S_TOKEN="{{ hostvars[groups['first_master'][0]].token }}" sh -s - server --server https://{{ hostvars[groups['first_master'][0]].ansible_default_ipv4.address }}:6443
+    become: true
 ```
 3. **Join nodes to the cluster** : This play executes the last task that will link our nodes to the control plane.
 
 ```yaml
 - name: Join nodes to the cluster
-	hosts: nodes
-	become: true
+  hosts: nodes
+  become: true
 
-	tasks:
-	- name: Join nodes to the k3s cluster
-	shell: curl -sfL https://get.k3s.io | K3S_TOKEN="{{ hostvars[groups['first_master'][0]].token }}" sh -s - agent --server https://{{ hostvars[groups['first_master'][0]].ansible_default_ipv4.address }}:6443
-	become: true
+  tasks:
+  - name: Join nodes to the k3s cluster
+  shell: curl -sfL https://get.k3s.io | K3S_TOKEN="{{ hostvars[groups['first_master'][0]].token }}" sh -s - agent --server https://{{ hostvars[groups['first_master'][0]].ansible_default_ipv4.address }}:6443
+  become: true
 ```
 After writing our playbook, we add the command to the `k3s/main.sh` file execute our playbook.
 ```bash 
