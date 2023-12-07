@@ -342,7 +342,8 @@ We then execute the following command to get the external IP address
 ```bash
 kubectl get svc prometheus-operator-grafana -n monitoring | awk '{print $4}'
 ```
-The defaults credentials are : **admin:prom-operator** 
+The defaults credentials are : **admin:prom-operator**.
+
 As we can see in the following image, we have all the dashboard for our Kubernetes cluster, including nodes and pods. 
 ![image](https://github.com/hamza-boudouche/cloud-computing-project/assets/70110557/ebbb3e4e-1110-4623-917f-bc1e8644c7eb)
 
