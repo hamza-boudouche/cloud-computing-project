@@ -830,11 +830,11 @@ To apply  its configuration, Ansible uses a file called **playbook** which as a 
   hosts: first_master
   become: true
     tasks:
-    - name: install k3s on first master
+  - name: install k3s on first master
     shell: curl -sfL https://get.k3s.io | sh -s - server --cluster-init
     become: true
 
-    - name: Get the k3s cluster token
+  - name: Get the k3s cluster token
     shell: cat /var/lib/rancher/k3s/server/node-token
     register: k3s_token
     become: true
@@ -850,7 +850,7 @@ To apply  its configuration, Ansible uses a file called **playbook** which as a 
   become: true
 
   tasks:
-    - name: Join masters to cluster
+  - name: Join masters to cluster
     shell: curl -sfL https://get.k3s.io | K3S_TOKEN="{{ hostvars[groups['first_master'][0]].token }}" sh -s - server --server https://{{ hostvars[groups['first_master'][0]].ansible_default_ipv4.address }}:6443
     become: true
 ```
@@ -862,7 +862,7 @@ To apply  its configuration, Ansible uses a file called **playbook** which as a 
   become: true
 
   tasks:
-  - name: Join nodes to the k3s cluster
+- name: Join nodes to the k3s cluster
   shell: curl -sfL https://get.k3s.io | K3S_TOKEN="{{ hostvars[groups['first_master'][0]].token }}" sh -s - agent --server https://{{ hostvars[groups['first_master'][0]].ansible_default_ipv4.address }}:6443
   become: true
 ```
