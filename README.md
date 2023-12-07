@@ -29,15 +29,13 @@ making sure that we don't over-provision compute resources.
 
 The commands we typically used to create the Kubernetes cluster is as follows:
 
-TODO: change cluster to regional instead of zonal
-
 ```bash
 # the GCP project ID
 export PROJECT_ID=xxxxxxxxxxxxx
 # the type of the worker nodes
 export M_TYPE=e2-standard-2
 # the zone in which to create the cluster
-export ZONE=
+export ZONE=us-central1-b
 
 gcloud container clusters create $CLUSTER_NAME \
   --cluster-version latest \
@@ -161,7 +159,7 @@ settled on the following minimal configuration composed of the following microse
 - redis-cart
 
 We removed the deployment and service resources of all the other microservices,
-and were left with this YAML manifest. TODO: insert link to the minimal-yaml manifest.
+and were left with [this YAML manifest](./minimal-manifest.yaml).
 (this file also contains declarations of a second version of the productcatalog Service
 and the Orderlog service that we will discuss in the rest of this report).
 
@@ -182,11 +180,11 @@ GKE cluster were the rest of the application resides. For this step, we chose to
 locally using Docker.
 
 In order to do this, and to simplify some of the tasks in the next steps of this lab,
-we chose to [make some minor changes]() to the Dockerfile that's provided in the
+we chose to [make some minor changes](./loadgenerator-dockerfile) to the Dockerfile that's provided in the
 [application repository](https://github.com/GoogleCloudPlatform/microservices-demo).
 The main change we made was removing the `ENTRYPOINT` of the docker image,
 because we wanted to customize the command that will be passed to the container
-upon its creation. TODO: add link to the new dockerfile
+upon its creation.
 
 This new Dockerfile should be put instead of the old Dockerfile (in the same location),
 and built using the following command:
