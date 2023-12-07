@@ -1,5 +1,31 @@
 # cloud-computing-project
 
+## Table of contents:
+
+- [cloud-computing-project](#cloud-computing-project)
+  * [Base steps](#base-steps)
+    + [Deploying the original application in GKE](#deploying-the-original-application-in-gke)
+    + [Analyzing the provided configuration](#analyzing-the-provided-configuration)
+    + [Targeting a minimal deployment](#targeting-a-minimal-deployment)
+    + [Deploying the load generator on a local machine](#deploying-the-load-generator-on-a-local-machine)
+    + [Deploying automatically the load generator in Google cloud](#deploying-automatically-the-load-generator-in-google-cloud)
+  * [Advanced steps](#advanced-steps)
+    + [Monitoring the application and the infrastructure](#monitoring-the-application-and-the-infrastructure)
+    + [Performance evaluation](#performance-evaluation)
+      - [Launching the Load generator](#launching-the-load-generator)
+      - [Infrastructure as Code](#infrastructure-as-code)
+      - [Graphs of the Locust results](#graphs-of-the-locust-results)
+    + [Canary releases](#canary-releases)
+      - [Creating a new version of a microservice](#creating-a-new-version-of-a-microservice)
+        * [NB](#nb)
+        * [When to use a service mesh](#when-to-use-a-service-mesh)
+  * [Bonus steps](#bonus-steps)
+    + [Performance evaluation bonus](#performance-evaluation-bonus)
+    + [Managing a storage backend for logging orders](#managing-a-storage-backend-for-logging-orders)
+    + [Deploying your own Kubernetes infrastructure](#deploying-your-own-kubernetes-infrastructure)
+      - [1. Provisioning the virtual machines to run our servers](#1-provisioning-the-virtual-machines-to-run-our-servers)
+      - [2. Configuring the master and worker nodes.](#2-configuring-the-master-and-worker-nodes)
+
 ## Base steps
 
 ### Deploying the original application in GKE
@@ -208,7 +234,7 @@ docker run -d hamza13/loadgen2 locust --headless --host=http://$FRONTEND_IP
 The first command fetches the public IP address of the application's frontend
 and stores it in the variable `FRONTEND_IP`.This variable be used by the second
 command , in which we start a docker container using the docker image we built before.
-To run our container, we pass the following arguments : the docker image, the Locust CLI 
+To run our container, we pass the following arguments : the docker image, the Locust CLI
 command, the headless mode argument and the host using the `FRONTEND_IP` variable.
 
 
@@ -233,7 +259,7 @@ The setup we made functions as follows:
 # the name of the service account to create
 export SERVICE_ACCOUNT=terraform
 # the GCP project ID
-export $PROJECT_ID=xxxxxxxxxxxxx
+export PROJECT_ID=xxxxxxxxxxxxx
 
 gcloud iam service-accounts create $SERVICE_ACCOUNT
 gcloud projects add-iam-policy-binding $PROJECT_ID \
@@ -338,7 +364,7 @@ helm install prometheus-operator prometheus-community/kube-prometheus-stack -n m
 ```
 Last but not least, we change the Grafana operator from ClusterIP to LoadBalancer since we are in a GKE cluster.
 ``` bash
-kubectl edit svc prometheus-operator-grafana -n monitoring 
+kubectl edit svc prometheus-operator-grafana -n monitoring
 ```
 We then execute the following command to get the external IP address
 ```bash
@@ -346,7 +372,7 @@ kubectl get svc prometheus-operator-grafana -n monitoring | awk '{print $4}'
 ```
 The defaults credentials are : **admin:prom-operator**.
 
-As we can see in the following image, we have all the dashboard for our Kubernetes cluster, including nodes and pods. 
+As we can see in the following image, we have all the dashboard for our Kubernetes cluster, including nodes and pods.
 ![grafana](./png/Grafana.png)
 ### Performance evaluation
 
