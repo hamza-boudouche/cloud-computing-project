@@ -1,0 +1,25 @@
+---
+- name: Setup locust
+  hosts: all
+  become: yes
+  remote_user: gcp
+
+  tasks:
+    - name: Start locust master
+      docker_container:
+        name: locust_master
+        image: hamza13/loadgen2
+        state: started
+        pull: yes
+        expose:
+          - 8089
+        ports:
+          - "8089:8089"
+        env:
+          FRONTEND_ADDR: "{{ lookup('env','FRONTEND_ADDR') }}"
+        command:
+          - "locust"
+          - "--headless"
+          - "--host={{ lookup('env','FRONTEND_ADDR') }}"
+          - "--users={{ lookup('env','USER_NO') }}"
+          - "--spawn-rate=5"

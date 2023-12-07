@@ -1,6 +1,6 @@
 ---
 - name: Install Docker and run Nginx container
-  hosts: label_ansible_loadgen
+  hosts: all
   become: yes
   remote_user: gcp
 
@@ -50,13 +50,4 @@
       service:
         name: docker
         state: started
-
-    - name: Start Nginx container with environment variable
-      docker_container:
-        name: load_generator
-        image: gcr.io/google-samples/microservices-demo/loadgenerator:v0.8.1
-        state: started
-        pull: yes
-        env:
-          FRONTEND_ADDR: "{{ lookup('env','FRONTEND_ADDR') }}"
 

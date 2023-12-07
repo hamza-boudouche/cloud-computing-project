@@ -1,0 +1,20 @@
+FROM python:3.11.6-slim@sha256:e932b9a0f25c306d542fc69133d24b872a6a264810e300b553e7ecd027599ca5 as base
+
+FROM base as builder
+
+COPY requirements.txt .
+
+RUN pip install --prefix="/install" -r requirements.txt
+
+FROM base
+
+WORKDIR /loadgen
+
+COPY --from=builder /install /usr/local
+
+# Add application code.
+COPY locustfile.py .
+
+# enable gevent support in debugger
+ENV GEVENT_SUPPORT=True
+
