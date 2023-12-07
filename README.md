@@ -345,8 +345,7 @@ kubectl get svc prometheus-operator-grafana -n monitoring | awk '{print $4}'
 The defaults credentials are : **admin:prom-operator**.
 
 As we can see in the following image, we have all the dashboard for our Kubernetes cluster, including nodes and pods. 
-![image](https://github.com/hamza-boudouche/cloud-computing-project/assets/70110557/ebbb3e4e-1110-4623-917f-bc1e8644c7eb)
-
+![grafana](./png/Grafana.png)
 ### Performance evaluation
 
 This part is an extension of the part [Deploying automatically the load generator in Google cloud](###Deploying-automatically-the-load-generator-in-Google-cloud).
