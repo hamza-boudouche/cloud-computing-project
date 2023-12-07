@@ -305,6 +305,46 @@ terraform destroy -auto-approve
 ## Advanced steps
 
 ### Monitoring the application and the infrastructure
+Infrastructure monitoring is crucial in any system, it allows us to take a look at the current state of our system in terms of resources utilization, performance bottlenecks and identify unusual activities and much more.
+
+To monitor our infrastructure, we decided to use Prometheus and Grafana.
+
+Prometheus is an open-source monitoring tools that allows us to scrap various metrics from our infrastructure.
+In Prometheus, data scraping  can be customized to the application needs by specifying the scrapping rules in the Prometheus config file. It also allows us to create alert based on these metrics.
+https://prometheus.io/docs/introduction/overview/
+
+The metrics collected by Prometheus are hard to read and interpret, that's why we need another tool that can visualize our data. To do so, we used Grafana, an open source analytics and visualization web application.
+https://grafana.com/docs/grafana/latest/
+
+To properly install Prometheus and Grafana in Kubernetes, we need to create multiple deployment files and services responsible for deploying the applications containers, the metrics collectors, the alert managers the config maps to store the Prometheus configuration and custom controllers to manage theirs state. Doing manually this task is error-prone, that's why we decided to use a helm chart.
+
+Helm is a packaging tool that groups Kubernetes resources into what we call a chart. A chart can range from a simple deployment file for a simple service to a full scale application.
+https://helm.sh/docs/topics/charts/
+
+The first step was to install helm and add the **kube-Prometheus** repo and update our local repository:
+```bash
+helm repo add prometheus-community https://prometheus-community.github.io/helm-charts
+helm repo update
+```
+We then created a namespace to in our Kubernetes cluster for separation of concerns.
+```bash
+kubectl create namespace monitoring
+```
+After that we install our helm chart
+```bash
+helm install prometheus-operator prometheus-community/kube-prometheus-stack -n monitoring
+```
+Last but not least, we change the Grafana operator from ClusterIP to LoadBalancer since we are in a GKE cluster.
+``` bash
+kubectl edit svc prometheus-operator-grafana -n monitoring 
+```
+We then execute the following command to get the external IP address
+```bash
+kubectl get svc prometheus-operator-grafana -n monitoring | awk '{print $4}'
+```
+The defaults credentials are : **admin:prom-operator** 
+As we can see in the following image, we have all the dashboard for our Kubernetes cluster, including nodes and pods. 
+![image](https://github.com/hamza-boudouche/cloud-computing-project/assets/70110557/ebbb3e4e-1110-4623-917f-bc1e8644c7eb)
 
 ### Performance evaluation
 
